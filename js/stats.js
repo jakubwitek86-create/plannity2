@@ -95,6 +95,13 @@ V.stats = {
     <div class="card">
       <div class="bars14">${days14.map(x => `<div title="${fmt(x.d)}: ${x.n} zrobionych">${x.n ? `<b>${x.n}</b>` : ''}<i style="height:${x.n / max14 * 85}%"></i><span>${parse(x.d).getDate()}</span></div>`).join('')}</div>
       <div class="small dim" style="margin-top:6px">Liczba zadań oznaczonych jako zrobione danego dnia.</div>
+    </div>
+
+    <div class="sec-title"><span>Randki i gesty dla Oli</span><span class="dim">30 dni: ${S.dates.reduce((a, x) => a + (x.history || []).filter(d => d > addDays(t, -30)).length, 0)}</span></div>
+    <div class="card">
+      ${S.dates.length ? S.dates.map(x => { const h = x.history || [], n30 = h.filter(d => d > addDays(t, -30)).length, max = Math.max(1, ...S.dates.map(y => (y.history || []).length));
+        return `<div class="srow"><div class="top"><span>${esc(x.title)}</span><b>${h.length}×</b></div>${bar(h.length / max * 100, 'var(--pink)')}
+          <div class="sub"><span>ostatnie 30 dni: ${n30}</span><span>${h[0] ? `ostatnio ${relShort(h[0])}` : 'jeszcze nie było'}</span></div></div>`; }).join('') : '<div class="muted small">Brak pomysłów.</div>'}
     </div>`;
   },
 };

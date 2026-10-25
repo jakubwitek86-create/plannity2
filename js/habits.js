@@ -57,7 +57,7 @@ function habitCard(h) {
     const d = addDays(t, -i);
     const due = habitDue(h, d);
     const s = h.log[d] || '';
-    strip.push(`<div class="c ${d === t ? 'today' : ''}"><span>${d === t ? 'Dziś' : DAYS_SHORT[dow(d)]}</span>
+    strip.push(`<div class="c ${d === t ? 'today' : ''} ${(h.notes || {})[d] ? 'hasnote' : ''}"><span>${d === t ? 'Dziś' : DAYS_SHORT[dow(d)]}</span>
       ${due ? `<button class="tri ${s}" data-act="habit-mark" data-id="${h.id}" data-d="${d}" aria-label="${fmt(d)}: ${s === 'v' ? 'zrealizowane' : s === 'x' ? 'niezrealizowane' : 'brak danych'}">${s === 'v' ? '✓' : s === 'x' ? '✗' : '?'}</button>`
         : `<button class="tri na" disabled aria-label="${fmt(d)}: nie dotyczy">–</button>`}
       <span>${parse(d).getDate()}</span></div>`);
@@ -69,6 +69,10 @@ function habitCard(h) {
       <span class="dim small" style="white-space:nowrap">${st.rate}% ›</span>
     </div>
     <div class="strip">${strip.join('')}</div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn small outline" style="white-space:nowrap;flex:none" data-act="habit-note" data-id="${h.id}">📝 ${(h.notes || {})[t] ? 'Notatka z dziś' : 'Notatka: godzina, nastrój'}</button>
+      ${(h.notes || {})[t] ? `<span class="small muted" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${[(h.notes[t].t || ''), moodEmo(h.notes[t].m), esc(h.notes[t].x || '')].filter(Boolean).join(' · ')}</span>` : ''}
+    </div>
   </article>`;
 }
 
@@ -132,11 +136,33 @@ A['habit-mark'] = el => {
 };
 A['freq-change'] = el => syncFreqFields(el.closest('form'));
 
-/* ---------- kalendarz historii nawyku ---------- */
+/* ---------- kalendarz historii nawyku + notatki dnia ---------- */
+const MOODS = [[1, '😫'], [2, '😕'], [3, '😐'], [4, '🙂'], [5, '😄']];
+const moodEmo = m => (MOODS.find(x => x[0] === +m) || [, ''])[1];
+const partOfDay = t => { if (!t) return null; const h = +t.slice(0, 2); return h < 12 ? 'rano' : h < 18 ? 'po południu' : 'wieczorem'; };
 let habitCal = null;
+function habitInsights(h) {
+  const notes = h.notes || {};
+  const rows = Object.keys(notes).map(d => ({ d, s: h.log[d] || '', ...notes[d] }));
+  if (!rows.length) return '';
+  const avg = arr => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+  const mv = avg(rows.filter(r => r.s === 'v' && r.m).map(r => +r.m)), mx = avg(rows.filter(r => r.s === 'x' && r.m).map(r => +r.m));
+  const pod = st => { const c = {}; rows.filter(r => r.s === st && r.t).forEach(r => { const p = partOfDay(r.t); c[p] = (c[p] || 0) + 1; }); const top = Object.entries(c).sort((a, b) => b[1] - a[1])[0]; return top ? `${top[0]} (${top[1]}×)` : null; };
+  const pv = pod('v'), px = pod('x');
+  const lines = [];
+  if (mv !== null || mx !== null) lines.push(`Średni nastrój: przy ✓ <b style="color:#fff">${mv !== null ? mv.toFixed(1) + ' ' + moodEmo(Math.round(mv)) : '–'}</b> · przy ✗ <b style="color:#fff">${mx !== null ? mx.toFixed(1) + ' ' + moodEmo(Math.round(mx)) : '–'}</b>`);
+  if (pv || px) lines.push(`Najczęściej: ✓ ${pv || '–'} · ✗ ${px || '–'}`);
+  const recent = rows.sort((a, b) => b.d.localeCompare(a.d)).slice(0, 12);
+  return `<h2 class="sec-title" style="margin-top:18px">Notatki – co wpływa na wynik</h2>
+    ${lines.length ? `<div class="muted small" style="margin-bottom:8px">${lines.join('<br>')}</div>` : ''}
+    <div class="small dim" style="margin-bottom:8px">Porównuj dni ✗ z dniami ✓: godzina, nastrój i okoliczności zwykle pokazują wzorzec po 2–3 tygodniach.</div>
+    ${recent.map(r => `<button type="button" class="ev ${r.s === 'x' ? '' : ''}" style="--ec:${r.s === 'v' ? 'var(--green)' : r.s === 'x' ? 'var(--red)' : 'var(--yellow)'};width:100%;text-align:left;color:inherit" data-act="hcal-sel" data-d="${r.d}">
+      <div class="et"><b>${r.s === 'v' ? '✓' : r.s === 'x' ? '✗' : '?'} ${fmtLong(r.d)}</b><small>${[r.t ? '🕒 ' + r.t : '', r.m ? moodEmo(r.m) : '', esc(r.x || '')].filter(Boolean).join(' · ')}</small></div></button>`).join('')}`;
+}
 function habitCalHTML() {
   const h = S.habits.find(x => x.id === habitCal.id); if (!h) return '';
-  const t = today(), m = habitCal.month, st = habitStats(h);
+  const t = today(), m = habitCal.month, st = habitStats(h), notes = h.notes || {};
+  const sel = habitCal.sel || t;
   const first = parse(m), y = first.getFullYear(), mo = first.getMonth();
   const offset = dow(m), nDays = lastDom(y, mo);
   let cells = DAYS_SHORT.map(d => `<div class="dn">${d}</div>`).join('');
@@ -148,8 +174,29 @@ function habitCalHTML() {
     let cls = 'dc';
     if (!due) cls += ' off'; else if (s === 'v') cls += ' v'; else if (s === 'x') cls += ' x'; else if (!fut) cls += ' q';
     if (d === t) cls += ' today';
-    cells += (due && !fut) ? `<button type="button" class="${cls}" data-act="habit-mark" data-id="${h.id}" data-d="${d}" aria-label="${fmt(d)}">${i}</button>` : `<div class="${cls}">${i}</div>`;
+    if (d === sel) cls += ' sel';
+    if (notes[d]) cls += ' hn';
+    cells += (due && !fut) ? `<button type="button" class="${cls}" data-act="hcal-sel" data-d="${d}" aria-label="${fmt(d)}">${i}</button>` : `<div class="${cls}">${i}</div>`;
   }
+  const n = habitCal.draft || notes[sel] || {};
+  const s = h.log[sel] || '';
+  const selDue = habitDue(h, sel) && sel <= t;
+  const editor = selDue ? `
+    <div class="card" id="hnote" style="margin-top:14px;background:var(--card)">
+      <h2 style="margin-bottom:10px">${fmtLong(sel)}${sel === t ? ' · dziś' : ''}</h2>
+      <div class="row" style="gap:8px;margin-bottom:14px">
+        <button type="button" class="tri v ${s === 'v' ? '' : 'dimmed'}" style="flex:1;width:auto;height:42px;font-size:15px" data-act="hset" data-s="v">✓ Tak</button>
+        <button type="button" class="tri x ${s === 'x' ? '' : 'dimmed'}" style="flex:1;width:auto;height:42px;font-size:15px" data-act="hset" data-s="x">✗ Nie</button>
+        <button type="button" class="tri ${s ? 'dimmed' : ''}" style="flex:1;width:auto;height:42px;font-size:15px" data-act="hset" data-s="">? Brak</button>
+      </div>
+      <div class="grid2">
+        ${field('Godzina', inTime('nt', n.t || ''))}
+        <div class="field"><span>Nastrój</span><div class="moods">${MOODS.map(([v, e]) => `<label><input type="radio" name="nm" value="${v}" ${+n.m === v ? 'checked' : ''}><span>${e}</span></label>`).join('')}</div></div>
+      </div>
+      <label class="field"><span>Notatka</span><textarea name="nx" style="min-height:84px" placeholder="Co się działo? np. późno z pracy, zmęczenie, chore dzieci, dobry sen…">${esc(n.x || '')}</textarea></label>
+      <div class="row"><button type="button" class="btn primary" style="flex:1" data-act="hnote-save">Zapisz notatkę</button>
+        ${notes[sel] ? `<button type="button" class="btn danger" data-act="hnote-del">Usuń</button>` : ''}</div>
+    </div>` : `<p class="small dim" style="margin-top:12px">Wybierz w kalendarzu dzień, w którym nawyk obowiązywał, aby dodać notatkę.</p>`;
   return `
     <div class="muted small" style="margin-bottom:10px">🔁 ${freqLabel(h.freq)} · ${h.mode === 'until' ? `${fmt(h.start)} – ${fmt(h.end)}` : `od ${fmt(h.start)}`}</div>
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
@@ -164,13 +211,43 @@ function habitCalHTML() {
         <b>${cap(MONTHS[mo])} ${y}</b>
         <button type="button" class="icon-btn" data-act="hcal-move" data-v="1" aria-label="Następny miesiąc">${icon('right')}</button></div>
       <div class="grid">${cells}</div>
-      <div class="legend"><span><i style="background:var(--green)"></i>zrealizowane</span><span><i style="background:var(--red)"></i>niezrealizowane</span><span><i style="background:rgba(255,211,77,.5)"></i>brak danych</span><span><i style="background:rgba(150,200,255,.1)"></i>nie dotyczy</span></div>
+      <div class="legend"><span><i style="background:var(--green)"></i>zrealizowane</span><span><i style="background:var(--red)"></i>niezrealizowane</span><span><i style="background:rgba(255,211,77,.5)"></i>brak danych</span><span><i style="background:#fff;border-radius:50%;width:7px;height:7px"></i>notatka</span></div>
+      <div class="small dim" style="margin-top:6px">Dotknij dzień, aby zmienić stan i dodać notatkę.</div>
     </div>
+    ${editor}
+    ${habitInsights(h)}
     <div class="row" style="margin-top:16px"><button type="button" class="btn outline" style="flex:1" data-act="habit-edit" data-id="${h.id}">${icon('edit', 'sm')} Edytuj nawyk</button></div>`;
 }
-A['habit-open'] = el => {
-  const h = S.habits.find(x => x.id === el.dataset.id); if (!h) return;
-  habitCal = { id: h.id, month: startOfMonth(today()) };
+function readNoteDraft() {
+  const f = sheetCtx && sheetCtx.form; if (!f || !f.elements.nx) return null;
+  const m = f.querySelector('input[name="nm"]:checked');
+  return { t: f.elements.nt.value, m: m ? +m.value : null, x: f.elements.nx.value };
+}
+function openHabitSheet(id, sel, toNote) {
+  const h = S.habits.find(x => x.id === id); if (!h) return;
+  habitCal = { id, month: startOfMonth(sel || today()), sel: sel || today(), draft: null };
   openSheet({ title: h.name, body: habitCalHTML(), refresh: habitCalHTML });
-};
+  if (toNote) setTimeout(() => { const e = $('#hnote'); if (e) e.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'smooth' }); }, 80);
+}
+A['habit-open'] = el => openHabitSheet(el.dataset.id);
+A['habit-note'] = el => openHabitSheet(el.dataset.id, today(), true);
 A['hcal-move'] = el => { habitCal.month = startOfMonth(addMonths(habitCal.month, +el.dataset.v)); refreshSheet(); };
+A['hcal-sel'] = el => { habitCal.sel = el.dataset.d; habitCal.month = startOfMonth(el.dataset.d); habitCal.draft = null; refreshSheet(); const e = $('#hnote'); if (e) e.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'smooth' }); };
+A['hset'] = el => {
+  const h = S.habits.find(x => x.id === habitCal.id); if (!h) return;
+  habitCal.draft = readNoteDraft();
+  const v = el.dataset.s; if (v) h.log[habitCal.sel] = v; else delete h.log[habitCal.sel];
+  save(); refreshSheet(); render();
+};
+A['hnote-save'] = () => {
+  const h = S.habits.find(x => x.id === habitCal.id); if (!h) return;
+  const n = readNoteDraft(); if (!n) return;
+  h.notes = h.notes || {};
+  if (!n.t && !n.m && !n.x.trim()) delete h.notes[habitCal.sel];
+  else h.notes[habitCal.sel] = { t: n.t || '', m: n.m || null, x: n.x.trim() };
+  habitCal.draft = null; save(); refreshSheet(); render(); toast('Zapisano notatkę');
+};
+A['hnote-del'] = () => {
+  const h = S.habits.find(x => x.id === habitCal.id); if (!h || !h.notes) return;
+  delete h.notes[habitCal.sel]; habitCal.draft = null; save(); refreshSheet(); render();
+};

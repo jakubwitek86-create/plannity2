@@ -9,6 +9,8 @@ const MODULES = [
   { r: 'schedule', name: 'Harmonogram dnia', ic: 'schedule' },
   { r: 'chores', name: 'Obowiązki domowe', ic: 'chores' },
   { r: 'notes', name: 'Notatki', ic: 'notes' },
+  { r: 'gifts', name: 'Pomysły na prezent', ic: 'gift' },
+  { r: 'dates', name: 'Randki z Olą', ic: 'heart' },
   { r: 'stats', name: 'Statystyki', ic: 'stats' },
 ];
 function moduleBadge(r) {

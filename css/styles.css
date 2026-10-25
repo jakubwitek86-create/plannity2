@@ -62,7 +62,7 @@ svg.i.sm{width:18px;height:18px}
 .icon-btn:active{background:var(--card2)}
 .icon-btn.ghost{visibility:hidden}
 
-main{padding:14px 16px calc(var(--nav-h) + 88px + var(--safe-b));max-width:860px;margin:0 auto;outline:none}
+main{padding:14px 16px calc(96px + var(--safe-b));max-width:860px;margin:0 auto;outline:none}
 
 .bottomnav{
   position:fixed;left:0;right:0;bottom:0;z-index:30;
@@ -114,7 +114,7 @@ main{padding:14px 16px calc(var(--nav-h) + 88px + var(--safe-b));max-width:860px
 .btn[disabled]{opacity:.5}
 
 .fab{
-  position:fixed;right:18px;bottom:calc(var(--nav-h) + 18px + var(--safe-b));z-index:25;
+  position:fixed;right:18px;bottom:calc(20px + var(--safe-b));z-index:25;
   width:58px;height:58px;border-radius:18px;border:0;
   background:var(--accent);color:var(--accent-ink);
   display:grid;place-items:center;
@@ -359,7 +359,7 @@ details.more[open] summary::before{transform:rotate(90deg)}
 /* ---------- schedule ---------- */
 .sched-wrap{
   position:relative;overflow:auto;border:1px solid var(--line);border-radius:14px;background:var(--card);
-  height:calc(100vh - 230px - var(--safe-b) - var(--safe-t));min-height:360px;
+  height:calc(100vh - 170px - var(--safe-b) - var(--safe-t));min-height:360px;
   -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
 }
 .sched{display:grid;grid-template-columns:44px repeat(7,minmax(92px,1fr));min-width:688px;position:relative}
@@ -452,7 +452,7 @@ details.more[open] summary::before{transform:rotate(90deg)}
 .menu-list .tile{min-height:88px}
 
 .toast{
-  position:fixed;left:50%;bottom:calc(var(--nav-h) + 16px + var(--safe-b));transform:translateX(-50%) translateY(20px);
+  position:fixed;left:50%;bottom:calc(90px + var(--safe-b));transform:translateX(-50%) translateY(20px);
   background:#e9f5ff;color:var(--accent-ink);padding:11px 14px;border-radius:12px;font-weight:650;font-size:14.5px;
   z-index:80;opacity:0;pointer-events:none;transition:all .2s;display:flex;gap:12px;align-items:center;max-width:calc(100% - 32px);
   box-shadow:0 8px 24px rgba(0,0,0,.4);width:max-content;min-width:min(300px,calc(100% - 32px));justify-content:space-between;
@@ -469,3 +469,19 @@ details.more[open] summary::before{transform:rotate(90deg)}
   main{padding-left:12px;padding-right:12px}
   .tile{font-size:12.5px}
 }
+
+/* v1.1 */
+.mcal .dc.sel{outline:3px solid #fff;outline-offset:1px}
+.mcal .dc.hn{position:relative}
+.mcal .dc.hn::after{content:"";position:absolute;bottom:4px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:#fff}
+.strip .c.hasnote span:last-child::after{content:" •";color:#fff}
+.tri.dimmed{opacity:.38}
+.moods{display:flex;gap:4px}
+.moods label{flex:1}
+.moods input{position:absolute;opacity:0;pointer-events:none}
+.moods span{display:grid;place-items:center;height:44px;border-radius:10px;border:1px solid var(--line2);font-size:20px;filter:grayscale(.7);opacity:.75}
+.moods input:checked + span{background:var(--accent2);border-color:var(--accent2);filter:none;opacity:1}
+.choice{display:flex;flex-direction:column;gap:10px}
+.choice .btn{justify-content:flex-start;text-align:left;padding:14px}
+.choice .btn small{display:block;font-weight:500;color:var(--muted);font-size:13px}
+.sheet-panel{overflow-x:hidden}

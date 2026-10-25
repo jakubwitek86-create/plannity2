@@ -1,6 +1,5 @@
 'use strict';
 /* ================= Router, nawigacja, zdarzenia ================= */
-const NAV = [['home', 'Start', 'home'], ['tasks', 'Zadania', 'tasks'], ['calendar', 'Kalendarz', 'calendar'], ['habits', 'Nawyki', 'habits'], ['menu', 'Więcej', 'menu']];
 const currentRoute = () => { const r = (location.hash || '').replace(/^#\/?/, ''); return V[r] ? r : 'home'; };
 function go(r) { if (currentRoute() === r) { render(); window.scrollTo(0, 0); return; } location.hash = '#/' + r; }
 
@@ -15,7 +14,6 @@ function render() {
   $('#pageTitle').textContent = view.title;
   $('#backBtn').innerHTML = r === 'home' ? icon('home') : icon('back');
   $('#backBtn').classList.toggle('ghost', r === 'home');
-  $('#bottomnav').innerHTML = NAV.map(([k, l, ic]) => `<button class="${k === r ? 'on' : ''}" data-act="${k === 'menu' ? 'menu' : 'go'}" data-r="${k}">${icon(ic)}<span>${l}</span></button>`).join('');
   if (view.after) view.after();
   if (same) window.scrollTo(0, y); else window.scrollTo(0, 0);
   lastRoute = r;

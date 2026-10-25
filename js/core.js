@@ -1,6 +1,6 @@
 'use strict';
 /* ================= Plannity – rdzeń ================= */
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 const V = {};            // widoki
 const A = {};            // akcje (data-act)
 const $ = (s, el = document) => el.querySelector(s);
@@ -70,6 +70,8 @@ const IC = {
   chores: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>',
   notes: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h5"/>',
   stats: '<path d="M3 21h18"/><path d="M6 17v-5M11 17V6M16 17v-8M21 17v-3"/>',
+  gift: '<rect x="3" y="8" width="18" height="5" rx="1"/><path d="M5 13v8h14v-8M12 8v13M12 8c-1-3-5-5-6-2.5S9 8 12 8zM12 8c1-3 5-5 6-2.5S15 8 12 8z"/>',
+  heart: '<path d="M12 20s-7-4.4-9-9a4.8 4.8 0 0 1 9-3 4.8 4.8 0 0 1 9 3c-2 4.6-9 9-9 9z"/>',
   refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
   send: '<path d="M5 12h12M13 6l6 6-6 6"/>',
   download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
@@ -84,7 +86,7 @@ const KEY = 'plannity_v1';
 let S;
 function defaultState() {
   return {
-    v: 1, tasks: [], goals: [], habits: [], counters: [], blocks: [], chores: seedChores(), notes: [], weather: null,
+    v: 1, tasks: [], goals: [], habits: [], counters: [], blocks: [], chores: seedChores(), notes: [], gifts: seedGifts(), dates: seedDates(), weather: null,
     ui: { taskGroup: 'date', taskPrio: 'all', taskRange: 'all', taskDay: today(), goalSort: 'date', goalCat: 'all', calMode: 'month', calDate: today(), calSrc: ['task', 'goal', 'habit', 'counter', 'chore'], choreArea: 'all', schedWeek: startOfWeek(today()), noteQ: '' },
   };
 }
@@ -95,6 +97,7 @@ function loadState() {
   if (!s || typeof s !== 'object') return d;
   for (const k in d) if (s[k] === undefined) s[k] = d[k];
   s.ui = { ...d.ui, ...s.ui };
+  s.habits.forEach(h => { if (!h.notes) h.notes = {}; });
   return s;
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { console.warn('Zapis nieudany', e); } }

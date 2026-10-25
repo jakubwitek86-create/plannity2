@@ -1,9 +1,9 @@
 /* Plannity – service worker: działanie offline */
-const CACHE = 'plannity-v1.0.0';
+const CACHE = 'plannity-v1.1.0';
 const ASSETS = [
   './', './index.html', './manifest.json', './css/styles.css',
   './js/core.js', './js/home.js', './js/tasks.js', './js/goals.js', './js/habits.js', './js/counters.js',
-  './js/calendar.js', './js/schedule.js', './js/chores.js', './js/notes.js', './js/stats.js', './js/app.js',
+  './js/calendar.js', './js/schedule.js', './js/chores.js', './js/notes.js', './js/gifts.js', './js/dates.js', './js/stats.js', './js/app.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png',
 ];
 self.addEventListener('install', e => {

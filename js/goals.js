@@ -10,19 +10,20 @@ function goalPct(g) {
   return Math.round(ms.filter(m => m.done).length / ms.length * 100);
 }
 const goalKey = o => o.end || o.start || '9999-12-31';
+const linkedHabit = (gid, mid) => S.habits.find(h => h.link && h.link.g === gid && (h.link.m || null) === (mid || null));
+const moveLabel = (gid, mid) => { const t = linkedTask(gid, mid), h = linkedHabit(gid, mid); return t && h ? '✓ zadanie + nawyk' : t ? '✓ w zadaniach' : h ? '✓ w nawykach' : null; };
 const linkedTask = (gid, mid) => S.tasks.find(k => k.link && k.link.g === gid && (k.link.m || null) === (mid || null));
 
 function msRow(g, m) {
-  const lt = linkedTask(g.id, m.id);
   const st = dateRangeStatus(m);
   return `<li class="${m.done ? 'done' : ''}">
     <button class="check ${m.done ? 'on' : ''}" data-act="ms-toggle" data-g="${g.id}" data-m="${m.id}" aria-label="Krok zrealizowany"></button>
     <div class="mt" data-act="ms-edit" data-g="${g.id}" data-m="${m.id}"><span>${esc(m.title)}</span><small>${dateRangeLabel(m)}${st ? ' · ' + st : ''}</small></div>
-    ${m.done ? '' : lt ? `<span class="totask in">✓ w zadaniach</span>` : `<button class="totask" data-act="to-task" data-g="${g.id}" data-m="${m.id}">${icon('send', 'sm')}Do zadań</button>`}
+    ${m.done ? '' : `<button class="totask ${moveLabel(g.id, m.id) ? 'in' : ''}" data-act="goal-move" data-g="${g.id}" data-m="${m.id}">${moveLabel(g.id, m.id) || icon('send', 'sm') + 'Przenieś'}</button>`}
   </li>`;
 }
 function goalCard(g) {
-  const pct = goalPct(g), st = dateRangeStatus(g), lt = linkedTask(g.id, null);
+  const pct = goalPct(g), st = dateRangeStatus(g);
   return `<article class="goal ${g.done ? 'done' : ''}">
     <div class="gh">
       <button class="check ${g.done ? 'on' : ''}" data-act="goal-toggle" data-id="${g.id}" aria-label="Cel zrealizowany"></button>
@@ -36,7 +37,7 @@ function goalCard(g) {
     ${(g.ms || []).length ? `<ul class="ms">${[...g.ms].sort((a, b) => goalKey(a).localeCompare(goalKey(b))).map(m => msRow(g, m)).join('')}</ul>` : ''}
     <div class="actions">
       <button class="btn small outline" data-act="ms-new" data-g="${g.id}">${icon('plus', 'sm')} Krok milowy</button>
-      ${g.done ? '' : lt ? `<span class="totask in">✓ cel w zadaniach</span>` : `<button class="btn small outline" data-act="to-task" data-g="${g.id}">${icon('send', 'sm')} Cel do zadań</button>`}
+      ${g.done ? '' : `<button class="btn small outline" data-act="goal-move" data-g="${g.id}">${icon('send', 'sm')} ${moveLabel(g.id, null) ? 'Cel: ' + moveLabel(g.id, null) : 'Przenieś cel do zadań / nawyków'}</button>`}
     </div>
   </article>`;
 }
@@ -135,9 +136,40 @@ A['ms-toggle'] = el => {
   if (m.done && g.ms.every(x => x.done) && !g.done) toast('Wszystkie kroki zrobione – odhacz cel?', 'Odhacz', () => { g.done = true; g.doneDate = today(); save(); render(); });
 };
 A['to-task'] = el => {
+  closeSheet();
   const g = S.goals.find(x => x.id === el.dataset.g); if (!g) return;
   const m = el.dataset.m ? g.ms.find(x => x.id === el.dataset.m) : null;
   const title = m ? `${m.title} (${g.title})` : g.title;
   addTask(title, 1, today(), { g: g.id, m: m ? m.id : null });
   render(); toast('Dodano do „Do zrobienia” na dziś', 'Pokaż', () => go('tasks'));
+};
+
+/* ---------- przeniesienie celu / kroku do zadań lub nawyków ---------- */
+A['goal-move'] = el => {
+  const g = S.goals.find(x => x.id === el.dataset.g); if (!g) return;
+  const m = el.dataset.m ? g.ms.find(x => x.id === el.dataset.m) : null;
+  const o = m || g, lt = linkedTask(g.id, m && m.id), lh = linkedHabit(g.id, m && m.id);
+  const ds = `data-g="${g.id}" ${m ? `data-m="${m.id}"` : ''}`;
+  openSheet({
+    title: 'Przenieś', body: `<p class="muted" style="margin-top:0">„${esc(o.title)}”</p>
+      <div class="choice">
+        <button type="button" class="btn outline" data-act="to-task" ${ds}>📋 <span>Jako zadanie – jednorazowe<small>${lt ? `już jest w zadaniach (${lt.done ? 'zrobione' : relShort(lt.date)}) – dodam drugie` : 'trafi do „Do zrobienia” na dziś, odhaczenie zadania odhaczy też ' + (m ? 'krok milowy' : 'cel')}</small></span></button>
+        <button type="button" class="btn outline" data-act="to-habit" ${ds}>🔁 <span>Jako nawyk – powtarzalny<small>${lh ? `już jest nawyk „${esc(lh.name)}” – dodam kolejny` : 'np. codziennie, 3× w tygodniu – ustawisz harmonogram'}</small></span></button>
+      </div>`,
+  });
+};
+A['to-habit'] = el => {
+  const g = S.goals.find(x => x.id === el.dataset.g); if (!g) return;
+  const m = el.dataset.m ? g.ms.find(x => x.id === el.dataset.m) : null;
+  const o = m || g, t = today();
+  const pre = o.end && o.end >= t ? { name: o.title, mode: 'until', start: t, end: o.end, freq: { t: 'daily' } } : { name: o.title, mode: 'from', start: o.start || t, end: null, freq: { t: 'daily' } };
+  openSheet({
+    title: 'Nowy nawyk z planu rocznego', body: habitForm(pre),
+    onSave: (fd, f) => {
+      const n = S.habits.length;
+      if (saveHabit(null, fd, f) === false) return false;
+      if (S.habits.length > n) { S.habits[S.habits.length - 1].link = { g: g.id, m: m ? m.id : null }; save(); render(); }
+      toast('Dodano do nawyków', 'Pokaż', () => go('habits'));
+    },
+  });
 };
