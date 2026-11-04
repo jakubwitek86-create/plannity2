@@ -1,7 +1,9 @@
 'use strict';
 /* ================= 3) Nawyki ================= */
 const habitActive = (h, d) => d >= h.start && (!h.end || d <= h.end);
-const habitDue = (h, d) => habitActive(h, d) && isDue(h.freq, d, h.start);
+const habitDue = (h, d) => !h.group && habitActive(h, d) && isDue(h.freq, d, h.start);
+const habitKids = h => S.habits.filter(x => x.parent === h.id);
+const habitEnded = h => !!(h.end && h.end < today());
 const cycle = s => (!s ? 'v' : s === 'v' ? 'x' : '');
 
 function habitStats(h) {
@@ -39,7 +41,8 @@ function habitStats(h) {
   return { v, x, q, due, rate: due ? Math.round(v / due * 100) : 0, streak, best, unit: 'dni', unitLong: n => dni(n) };
 }
 
-function habitCard(h) {
+function habitCard(h, sub) {
+  if (h.group) return groupCard(h);
   const t = today(), st = habitStats(h);
   const ended = h.end && h.end < t;
   const info = [];
@@ -62,7 +65,8 @@ function habitCard(h) {
         : `<button class="tri na" disabled aria-label="${fmt(d)}: nie dotyczy">–</button>`}
       <span>${parse(d).getDate()}</span></div>`);
   }
-  return `<article class="habit">
+  const kids = sub ? [] : habitKids(h);
+  return `<article class="habit ${sub ? 'sub' : ''}">
     <div class="hh" data-act="habit-open" data-id="${h.id}">
       <div style="flex:1;min-width:0"><div class="hn">${esc(h.name)}</div>
         <div class="hm"><span>🔁 ${freqLabel(h.freq)}</span>${info.join('')}</div></div>
@@ -73,27 +77,73 @@ function habitCard(h) {
       <button class="btn small outline" style="white-space:nowrap;flex:none" data-act="habit-note" data-id="${h.id}">📝 ${(h.notes || {})[t] ? 'Notatka z dziś' : 'Notatka: godzina, nastrój'}</button>
       ${(h.notes || {})[t] ? `<span class="small muted" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${[(h.notes[t].t || ''), moodEmo(h.notes[t].m), esc(h.notes[t].x || '')].filter(Boolean).join(' · ')}</span>` : ''}
     </div>
+    ${kids.length ? subsHTML(h, kids) : ''}
   </article>`;
 }
 
+function subsHTML(h, kids) {
+  const t = today();
+  const due = kids.filter(k => habitDue(k, t)), done = due.filter(k => k.log[t] === 'v').length;
+  return `<div class="subs ${h.collapsed ? 'closed' : ''}">
+    <button class="subs-h" data-act="habit-collapse" data-id="${h.id}"><span>${h.collapsed ? '▸' : '▾'} Podnawyki (${kids.length})</span><span>${due.length ? `dziś ${done}/${due.length}` : ''}</span></button>
+    ${h.collapsed ? '' : kids.map(k => habitCard(k, true)).join('')}
+  </div>`;
+}
+function groupCard(h) {
+  const kids = habitKids(h);
+  return `<article class="habit group">
+    <div class="hh" data-act="habit-edit" data-id="${h.id}">
+      <div style="flex:1;min-width:0"><div class="hn">📁 ${esc(h.name)}</div><div class="hm"><span>grupa nawyków</span></div></div>
+      <span class="dim small">${icon('edit', 'sm')}</span>
+    </div>
+    ${kids.length ? subsHTML(h, kids) : '<div class="small dim" style="margin-top:8px">Pusta grupa – przypisz do niej nawyki w ich edycji („Należy do”).</div>'}
+  </article>`;
+}
+function reorderHTML() {
+  const tops = S.habits.filter(h => !h.parent || !S.habits.some(p => p.id === h.parent));
+  const row = (h, sub, i, n) => `<div class="ro ${sub ? 'sub' : ''}"><span>${h.group ? '📁 ' : ''}${esc(h.name)}${habitEnded(h) ? ' <em>(zakończony)</em>' : ''}</span>
+    <button class="icon-btn" data-act="habit-move" data-id="${h.id}" data-v="-1" ${i === 0 ? 'disabled' : ''} aria-label="W górę">↑</button>
+    <button class="icon-btn" data-act="habit-move" data-id="${h.id}" data-v="1" ${i === n - 1 ? 'disabled' : ''} aria-label="W dół">↓</button></div>`;
+  return `<div class="card"><h2 style="margin-bottom:6px">Ułóż kolejność</h2><div class="small muted">Strzałkami przesuwasz nawyk w górę lub w dół. Podnawyki przesuwają się w obrębie swojej grupy. Aby przenieść nawyk do innej grupy – edytuj go i zmień „Należy do”.</div></div>
+    <div class="list">${tops.map((h, i) => { const kids = habitKids(h); return row(h, false, i, tops.length) + kids.map((k, j) => row(k, true, j, kids.length)).join(''); }).join('')}</div>
+    <button class="btn primary" style="width:100%;margin-top:14px" data-act="habit-reorder">Gotowe</button>`;
+}
 V.habits = {
   title: 'Nawyki',
   render() {
     const t = today();
-    const act = S.habits.filter(h => !(h.end && h.end < t));
-    const ended = S.habits.filter(h => h.end && h.end < t);
-    const todo = act.filter(h => habitDue(h, t) && !h.log[t]).length;
+    if (S.ui.habitReorder) return reorderHTML();
+    const tops = S.habits.filter(h => !h.parent || !S.habits.some(p => p.id === h.parent));
+    const act = tops.filter(h => !habitEnded(h));
+    const ended = tops.filter(h => habitEnded(h));
+    const todo = S.habits.filter(h => habitDue(h, t) && !h.log[t]).length;
     return `
     <div class="card"><h2 style="margin-bottom:4px">Dziś</h2>
-      <div class="muted small">${act.length ? (todo ? `Do oznaczenia: <b style="color:#fff">${todo}</b> ${plural(todo, 'nawyk', 'nawyki', 'nawyków')}` : 'Wszystkie dzisiejsze nawyki oznaczone 👏') : 'Brak aktywnych nawyków'}</div>
+      <div class="muted small">${S.habits.length ? (todo ? `Do oznaczenia: <b style="color:#fff">${todo}</b> ${plural(todo, 'nawyk', 'nawyki', 'nawyków')}` : 'Wszystkie dzisiejsze nawyki oznaczone 👏') : 'Brak aktywnych nawyków'}</div>
       <div class="legend"><span><i style="background:var(--green)"></i>✓ zrealizowane</span><span><i style="background:var(--red)"></i>✗ niezrealizowane</span><span><i style="background:rgba(255,211,77,.5)"></i>? brak danych</span></div>
       <div class="small dim" style="margin-top:6px">Dotknij kwadrat, aby zmienić stan. Dotknij nazwę, aby zobaczyć kalendarz historii.</div>
     </div>
-    ${act.length ? act.map(habitCard).join('') : `<div class="empty"><b>Brak nawyków</b>Dodaj nawyk przyciskiem +.</div>`}
-    ${ended.length ? `<details class="more"><summary>Zakończone (${ended.length})</summary><div style="margin-top:10px">${ended.map(habitCard).join('')}</div></details>` : ''}
+    ${S.habits.length > 1 ? `<div class="toolbar"><button class="btn small outline" data-act="habit-reorder">↕ Ułóż kolejność</button><button class="btn small outline" data-act="habit-group-new">📁 Nowa grupa</button></div>` : ''}
+    ${act.length ? act.map(h => habitCard(h)).join('') : `<div class="empty"><b>Brak nawyków</b>Dodaj nawyk przyciskiem +.</div>`}
+    ${ended.length ? `<details class="more" data-key="hended"><summary>Zakończone (${ended.length})</summary><div style="margin-top:10px">${ended.map(h => habitCard(h)).join('')}</div></details>` : ''}
     ${fab('habit-new', 'Nowy nawyk')}`;
   },
 };
+A['habit-reorder'] = () => { S.ui.habitReorder = !S.ui.habitReorder; save(); render(); };
+A['habit-collapse'] = el => { const h = S.habits.find(x => x.id === el.dataset.id); if (h) { h.collapsed = !h.collapsed; save(); render(); } };
+A['habit-move'] = el => {
+  const h = S.habits.find(x => x.id === el.dataset.id); if (!h) return;
+  const isTop = x => !x.parent || !S.habits.some(p => p.id === x.parent);
+  const sib = S.habits.filter(x => isTop(h) ? isTop(x) : x.parent === h.parent);
+  const k = sib.indexOf(h), o = sib[k + +el.dataset.v]; if (!o) return;
+  const a = S.habits.indexOf(h), b = S.habits.indexOf(o);
+  [S.habits[a], S.habits[b]] = [S.habits[b], S.habits[a]];
+  save(); render();
+};
+A['habit-group-new'] = () => openSheet({
+  title: 'Nowa grupa nawyków', body: field('Nazwa grupy', inText('name', '', 'np. Angielski')) + '<p class="small dim">Grupa nie ma własnego odhaczania – zbiera podnawyki. Jeśli chcesz odhaczać też całość, utwórz zwykły nawyk i przypisz do niego podnawyki.</p>',
+  onSave: fd => { if (!fd.name.trim()) return false; S.habits.push({ id: uid(), name: fd.name.trim(), group: true, mode: 'from', start: today(), end: null, freq: { t: 'daily' }, log: {}, notes: {}, createdAt: today() }); save(); render(); },
+});
 
 function habitForm(h) {
   const mode = h ? h.mode : 'from';
@@ -101,7 +151,12 @@ function habitForm(h) {
   return field('Nawyk', inText('name', h ? h.name : '', 'np. 10 000 kroków')) +
     `<div class="grid2">${field('Tryb', sel('mode', [['from', 'Od dnia (passa)'], ['until', 'Do dnia (odliczanie)']], mode))}${field('Data', inDate('date', date))}</div>` +
     `<p class="hint small dim" style="margin:-6px 0 14px">„Od dnia” – nawyk bez końca, liczona jest passa. „Do dnia” – nawyk realizowany od dziś do wskazanej daty, pokazuje ile dni zostało.</p>` +
-    freqFields(h ? h.freq : { t: 'daily' }, 'habit');
+    freqFields(h ? h.freq : { t: 'daily' }, 'habit') + parentField(h);
+}
+function parentField(h) {
+  if (h && h.id && habitKids(h).length) return `<p class="small dim">Ten nawyk ma podnawyki (${habitKids(h).length}), więc sam zostaje na najwyższym poziomie.</p>`;
+  const opts = S.habits.filter(x => (!x.parent) && (!h || x.id !== h.id) && !habitEnded(x));
+  return field('Należy do (grupa / nawyk nadrzędny)', sel('parent', [['', '— brak (nawyk główny) —'], ...opts.map(x => [x.id, (x.group ? '📁 ' : '') + x.name])], h ? (h.parent || '') : ''), 'Np. „Słuchanie” jako podnawyk „Angielskiego”.');
 }
 function saveHabit(h, fd, form) {
   if (!fd.name.trim()) { toast('Wpisz nazwę nawyku'); return false; }
@@ -109,6 +164,7 @@ function saveHabit(h, fd, form) {
   const freq = readFreq(form);
   const n = h || { id: uid(), log: {}, createdAt: today() };
   n.name = fd.name.trim(); n.freq = freq; n.mode = fd.mode;
+  if (fd.parent !== undefined) n.parent = fd.parent || null;
   if (fd.mode === 'until') {
     if (date < today() && !h) { toast('Data „do dnia” jest w przeszłości'); return false; }
     n.start = (h && h.mode === 'until') ? h.start : (h ? h.start : today());
@@ -121,9 +177,14 @@ function saveHabit(h, fd, form) {
 A['habit-new'] = () => openSheet({ title: 'Nowy nawyk', body: habitForm(null), onSave: (fd, f) => saveHabit(null, fd, f) });
 A['habit-edit'] = el => {
   const h = S.habits.find(x => x.id === el.dataset.id); if (!h) return;
+  if (h.group) return openSheet({
+    title: 'Grupa nawyków', body: field('Nazwa grupy', inText('name', h.name)),
+    onSave: fd => { if (!fd.name.trim()) return false; h.name = fd.name.trim(); save(); render(); },
+    onDelete: () => confirmSheet(`Usunąć grupę „${h.name}”? Podnawyki zostaną jako zwykłe nawyki.`, () => { habitKids(h).forEach(k => k.parent = null); S.habits = S.habits.filter(x => x !== h); save(); render(); }),
+  });
   openSheet({
     title: 'Edytuj nawyk', body: habitForm(h), onSave: (fd, f) => saveHabit(h, fd, f),
-    onDelete: () => confirmSheet(`Usunąć nawyk „${h.name}” wraz z historią?`, () => { S.habits = S.habits.filter(x => x !== h); save(); render(); }),
+    onDelete: () => confirmSheet(`Usunąć nawyk „${h.name}” wraz z historią?${habitKids(h).length ? ' Podnawyki zostaną jako zwykłe nawyki.' : ''}`, () => { habitKids(h).forEach(k => k.parent = null); S.habits = S.habits.filter(x => x !== h); save(); render(); }),
   });
 };
 A['habit-mark'] = el => {

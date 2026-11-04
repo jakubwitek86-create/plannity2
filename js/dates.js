@@ -34,7 +34,13 @@ V.dates = {
     const all = S.dates.flatMap(x => x.history || []);
     const m30 = all.filter(d => d > addDays(t, -30)).length;
     const lastAny = all.sort().slice(-1)[0];
-    return `<div class="card"><h2 style="margin-bottom:4px">Ostatnie 30 dni</h2>
+    return `<div class="card ola-note"><h2 style="margin-bottom:8px">Czego potrzebuje Ola</h2>
+      <p>Ola chciałaby, żebym wychodził z inicjatywą.</p>
+      <p>Jak coś się dzieje, to ja mam mówić, że to ogarnę – że <b>ja zrobię XYZ, a ona ABC</b> – i nie pytać jej o zgodę/zdanie.</p>
+      <p>Nie czekać, aż ona mi powie, co mam robić, tylko działać.</p>
+      <p>Ona chce czuć się <b>zaopiekowana i uwodzona</b>: randki, wspólny czas, wieczór gier, kolacja, obiad dla niej, kwiaty, drobne upominki.</p>
+    </div>
+    <div class="card"><h2 style="margin-bottom:4px">Ostatnie 30 dni</h2>
       <div class="muted small">Zrealizowane gesty: <b style="color:#fff">${m30}</b>${lastAny ? ` · ostatni: ${relShort(lastAny)}` : ''}</div>
       <div class="small dim" style="margin-top:6px">Odhacz, kiedy coś zrobisz – zapisze się data. Możesz odhaczyć tę samą rzecz kilka razy (np. inny dzień); wpis z dziś cofniesz w historii.</div></div>
       <div class="list">${S.dates.map(dateRow).join('')}</div>

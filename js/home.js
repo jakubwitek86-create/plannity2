@@ -21,7 +21,7 @@ function moduleBadge(r) {
       const late = open.some(k => k.origDate && k.origDate < t);
       return open.length ? { n: open.length, warn: late } : null;
     }
-    case 'habits': { const n = S.habits.filter(h => habitActive(h, t) && isDue(h.freq, t, h.start) && !h.log[t]).length; return n ? { n } : null; }
+    case 'habits': { const n = S.habits.filter(h => habitDue(h, t) && !h.log[t]).length; return n ? { n } : null; }
     case 'chores': { const due = S.chores.filter(c => c.nextDate && c.nextDate <= t); return due.length ? { n: due.length, warn: due.some(c => c.nextDate < t) } : null; }
     case 'goals': { const g = S.goals.filter(x => !x.done).length; return g ? { n: g } : null; }
     case 'notes': return S.notes.length ? { n: S.notes.length } : null;

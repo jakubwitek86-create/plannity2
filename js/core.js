@@ -1,6 +1,6 @@
 'use strict';
 /* ================= Plannity – rdzeń ================= */
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const V = {};            // widoki
 const A = {};            // akcje (data-act)
 const $ = (s, el = document) => el.querySelector(s);

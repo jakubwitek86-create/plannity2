@@ -25,7 +25,7 @@ V.stats = {
     const t = today();
     // KPI
     const goalAvg = S.goals.length ? Math.round(S.goals.reduce((s, g) => s + goalPct(g), 0) / S.goals.length) : 0;
-    const hs = S.habits.map(h => ({ h, s: habitStats(h) }));
+    const hs = S.habits.filter(h => !h.group).map(h => ({ h, s: habitStats(h) }));
     const bestStreak = hs.reduce((m, x) => Math.max(m, x.s.streak), 0);
     const cs = S.chores.map(c => ({ c, s: choreStats(c) }));
     const allH = cs.reduce((a, x) => a + x.s.n, 0), allOn = cs.reduce((a, x) => a + x.s.onTime, 0);
@@ -63,7 +63,7 @@ V.stats = {
       ${catRows ? `<h2 style="margin-top:16px">Wg kategorii</h2>${catRows}` : ''}
     </div>
 
-    <div class="sec-title"><span>Nawyki</span><span class="dim">${S.habits.length}</span></div>
+    <div class="sec-title"><span>Nawyki</span><span class="dim">${hs.length}</span></div>
     <div class="card">
       ${hs.length ? hs.map(({ h, s }) => {
         let heat = '';

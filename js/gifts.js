@@ -28,7 +28,17 @@ function giftCard(p) {
 V.gifts = {
   title: 'Pomysły na prezent',
   render() {
-    return `<p class="small muted" style="margin:0 2px 12px">Zapisuj pomysły od razu, kiedy przyjdą do głowy. Odhacz, kiedy prezent zostanie kupiony lub wręczony.</p>
+    if (S.ui.giftReorder) {
+      const row = (label, act, attrs, i, n, sub) => `<div class="ro ${sub ? 'sub' : ''}"><span>${label}</span>
+        <button class="icon-btn" data-act="${act}" ${attrs} data-v="-1" ${i === 0 ? 'disabled' : ''} aria-label="W górę">↑</button>
+        <button class="icon-btn" data-act="${act}" ${attrs} data-v="1" ${i === n - 1 ? 'disabled' : ''} aria-label="W dół">↓</button></div>`;
+      return `<div class="card"><h2 style="margin-bottom:6px">Ułóż kolejność</h2><div class="small muted">Przesuwaj osoby i pomysły strzałkami. Pomysły przesuwają się w obrębie swojej osoby.</div></div>
+        <div class="list">${S.gifts.map((p, i) => row('🎁 ' + esc(p.name), 'gift-move-p', `data-p="${p.id}"`, i, S.gifts.length, false) +
+          p.ideas.filter(x => !x.done).map((x, j, arr) => row(esc(x.text), 'gift-move-i', `data-p="${p.id}" data-i="${x.id}"`, j, arr.length, true)).join('')).join('')}</div>
+        <button class="btn primary" style="width:100%;margin-top:14px" data-act="gift-reorder">Gotowe</button>`;
+    }
+    return `<div class="toolbar"><button class="btn small outline" data-act="gift-reorder">↕ Ułóż kolejność</button></div>
+      <p class="small muted" style="margin:0 2px 12px">Zapisuj pomysły od razu, kiedy przyjdą do głowy. Odhacz, kiedy prezent zostanie kupiony lub wręczony.</p>
       ${S.gifts.map(giftCard).join('')}
       <button class="btn outline" style="width:100%" data-act="gift-person-new">${icon('plus', 'sm')} Dodaj osobę</button>`;
   },
@@ -64,3 +74,17 @@ A['gift-person-new'] = () => openSheet({
   title: 'Nowa osoba', body: field('Imię', inText('name', '', 'np. Wujek Rysiek')),
   onSave: fd => { if (!fd.name.trim()) return false; S.gifts.push({ id: uid(), name: fd.name.trim(), ideas: [] }); save(); render(); },
 });
+
+A['gift-reorder'] = () => { S.ui.giftReorder = !S.ui.giftReorder; save(); render(); };
+A['gift-move-p'] = el => {
+  const i = S.gifts.findIndex(x => x.id === el.dataset.p), j = i + +el.dataset.v;
+  if (i < 0 || j < 0 || j >= S.gifts.length) return;
+  [S.gifts[i], S.gifts[j]] = [S.gifts[j], S.gifts[i]]; save(); render();
+};
+A['gift-move-i'] = el => {
+  const p = S.gifts.find(x => x.id === el.dataset.p); if (!p) return;
+  const open = p.ideas.filter(x => !x.done), it = open.find(x => x.id === el.dataset.i);
+  const o = open[open.indexOf(it) + +el.dataset.v]; if (!o) return;
+  const a = p.ideas.indexOf(it), b = p.ideas.indexOf(o);
+  [p.ideas[a], p.ideas[b]] = [p.ideas[b], p.ideas[a]]; save(); render();
+};

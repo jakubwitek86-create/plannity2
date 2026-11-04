@@ -99,7 +99,7 @@ A['reset-all'] = () => confirmSheet('Usunąć wszystkie dane Plannity z tego tel
 /* ---------- start ---------- */
 function init() {
   S = loadState();
-  S.ui.calDate = today(); S.ui.schedWeek = startOfWeek(today());
+  S.ui.calDate = today(); S.ui.schedWeek = startOfWeek(today()); S.ui.habitReorder = false; S.ui.giftReorder = false;
   rolloverTasks();
   save();
   $('#menuBtn').innerHTML = icon('menu');
