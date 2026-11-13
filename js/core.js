@@ -1,6 +1,6 @@
 'use strict';
 /* ================= Plannity – rdzeń ================= */
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const V = {};            // widoki
 const A = {};            // akcje (data-act)
 const $ = (s, el = document) => el.querySelector(s);
@@ -86,7 +86,7 @@ const KEY = 'plannity_v1';
 let S;
 function defaultState() {
   return {
-    v: 1, tasks: [], goals: [], habits: [], counters: [], blocks: [], chores: seedChores(), notes: [], gifts: seedGifts(), dates: seedDates(), weather: null,
+    v: 1, tasks: [], goals: [], habits: [], counters: [], blocks: [], chores: seedChores(), notes: [], gifts: seedGifts(), dates: seedDates(), weather: null, meta: { createdAt: today(), lastBackup: null, persisted: false },
     ui: { taskGroup: 'date', taskPrio: 'all', taskRange: 'all', taskDay: today(), goalSort: 'date', goalCat: 'all', calMode: 'month', calDate: today(), calSrc: ['task', 'goal', 'habit', 'counter', 'chore'], choreArea: 'all', schedWeek: startOfWeek(today()), noteQ: '' },
   };
 }
@@ -97,6 +97,7 @@ function loadState() {
   if (!s || typeof s !== 'object') return d;
   for (const k in d) if (s[k] === undefined) s[k] = d[k];
   s.ui = { ...d.ui, ...s.ui };
+  s.meta = { ...d.meta, ...(s.meta || {}) };
   s.habits.forEach(h => { if (!h.notes) h.notes = {}; });
   return s;
 }
@@ -375,4 +376,35 @@ function dateRangeStatus(o) {
   if (o.end) { const n = diffDays(t, o.end); return n > 0 ? `zostało ${dni(n)}` : n === 0 ? 'termin dziś' : `po terminie ${dni(-n)}`; }
   if (o.start) { const n = diffDays(o.start, t); return n > 0 ? `trwa ${dni(n)}` : n === 0 ? 'start dziś' : `start za ${dni(-n)}`; }
   return '';
+}
+
+/* ---------- ochrona danych ---------- */
+function hasUserData() {
+  return !!(S.tasks.length || S.goals.length || S.habits.length || S.counters.length || S.notes.length || S.blocks.length ||
+    S.chores.some(c => (c.history || []).length) || S.dates.some(x => (x.history || []).length) ||
+    S.gifts.reduce((a, p) => a + p.ideas.length, 0) > 2);
+}
+function backupJSON() { return JSON.stringify({ ...S, weather: null, exportedAt: new Date().toISOString(), app: 'Plannity' }, null, 1); }
+const backupName = () => `plannity-kopia-${today()}.json`;
+const canShareFile = () => { try { return !!(navigator.canShare && navigator.canShare({ files: [new File(['{}'], 'x.json', { type: 'application/json' })] })); } catch (e) { return false; } };
+async function requestPersist() {
+  try {
+    if (!navigator.storage || !navigator.storage.persist) return;
+    let p = await navigator.storage.persisted();
+    if (!p) p = await navigator.storage.persist();
+    S.meta.persisted = !!p; save();
+  } catch (e) { }
+}
+function backupBanner() {
+  if (!hasUserData()) return `<section class="card bk">
+    <h2>Zaczynasz od zera?</h2>
+    <p class="small">Jeśli masz plik kopii (<b>plannity-kopia-….json</b> w Pobranych lub na Dysku Google), wczytaj go – wrócą wszystkie wpisy.</p>
+    <button class="btn primary small" data-act="backup-import">${icon('upload', 'sm')} Wczytaj kopię</button></section>`;
+  const last = S.meta.lastBackup, ago = last ? diffDays(last, today()) : null;
+  if (last && ago < 7) return '';
+  return `<section class="card bk warn">
+    <h2>${last ? `Ostatnia kopia: ${dni(ago)} temu` : 'Nie masz jeszcze kopii danych'}</h2>
+    <p class="small">Dane są tylko w tym telefonie. Czyszczenie pamięci lub przeglądarki je usuwa. Kopia zajmuje 5 sekund.</p>
+    <div class="row wrap">${canShareFile() ? `<button class="btn primary small" data-act="backup-share">${icon('send', 'sm')} Wyślij na Dysk Google</button>` : ''}
+      <button class="btn ${canShareFile() ? 'outline' : 'primary'} small" data-act="backup-export">${icon('download', 'sm')} Zapisz w telefonie</button></div></section>`;
 }

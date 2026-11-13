@@ -9,12 +9,19 @@ function render() {
   const same = r === lastRoute;
   const y = window.scrollY;
   const openKeys = same ? $$('details[open][data-key]', main).map(d => d.dataset.key) : [];
-  main.innerHTML = view.render();
+  try { main.innerHTML = view.render(); }
+  catch (err) {
+    console.error(err);
+    main.innerHTML = `<div class="card bk warn"><h2>Coś poszło nie tak w tej zakładce</h2>
+      <p class="small">Twoje dane są bezpieczne. Zapisz kopię i wyślij mi ten komunikat:</p>
+      <pre style="white-space:pre-wrap;font-size:12px;color:var(--muted)">${esc(String(err && err.stack || err)).slice(0, 600)}</pre>
+      <div class="row wrap"><button class="btn primary small" data-act="backup-export">Zapisz kopię</button><button class="btn outline small" data-act="go" data-r="home">Start</button></div></div>`;
+  }
   openKeys.forEach(k => { const d = $(`details[data-key="${k}"]`, main); if (d) d.open = true; });
   $('#pageTitle').textContent = view.title;
   $('#backBtn').innerHTML = r === 'home' ? icon('home') : icon('back');
   $('#backBtn').classList.toggle('ghost', r === 'home');
-  if (view.after) view.after();
+  try { if (view.after) view.after(); } catch (err) { console.error(err); }
   if (same) window.scrollTo(0, y); else window.scrollTo(0, 0);
   lastRoute = r;
 }
@@ -58,12 +65,11 @@ A.menu = () => openSheet({
   title: 'Menu',
   body: `<div class="menu-list">${MODULES.map(tileHTML).join('')}</div>
     <h2 class="sec-title" style="margin-top:6px">Kopia zapasowa</h2>
-    <p class="small muted" style="margin-top:0">Dane zapisują się w pamięci telefonu (w tej przeglądarce). Zrób kopię przed zmianą telefonu lub czyszczeniem przeglądarki.</p>
+    <p class="small muted" style="margin-top:0">Dane są tylko w pamięci tego telefonu. Ostatnia kopia: <b style="color:#fff">${S.meta.lastBackup ? fmt(S.meta.lastBackup) : 'brak'}</b>. Ochrona przed automatycznym usunięciem: <b style="color:#fff">${S.meta.persisted ? 'włączona' : 'niedostępna'}</b>.</p>
     <div class="row wrap">
-      <button type="button" class="btn outline" data-act="backup-export">${icon('download', 'sm')} Eksportuj dane</button>
+      ${canShareFile() ? `<button type="button" class="btn outline" data-act="backup-share">${icon('send', 'sm')} Wyślij kopię (Dysk)</button>` : ''}<button type="button" class="btn outline" data-act="backup-export">${icon('download', 'sm')} Eksportuj dane</button>
       <button type="button" class="btn outline" data-act="backup-import">${icon('upload', 'sm')} Importuj dane</button>
     </div>
-    <input type="file" id="importFile" accept="application/json,.json" class="hidden">
     <h2 class="sec-title">Inne</h2>
     <div class="row wrap">
       <button type="button" class="btn outline" data-act="reset-chores">Przywróć obowiązki z pliku</button>
@@ -72,12 +78,19 @@ A.menu = () => openSheet({
     <p class="small dim" style="margin-top:16px">Plannity ${APP_VERSION} · pogoda: Open-Meteo.com · wschody/zachody liczone lokalnie dla Warszawy (Ochota/Włochy)</p>`,
 });
 A['backup-export'] = () => {
-  const data = { ...S, weather: null, exportedAt: new Date().toISOString(), app: 'Plannity' };
-  const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+  S.meta.lastBackup = today(); save();
+  const blob = new Blob([backupJSON()], { type: 'application/json' });
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = `plannity-kopia-${today()}.json`;
+  a.href = URL.createObjectURL(blob); a.download = backupName();
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
-  toast('Zapisano plik kopii');
+  toast('Zapisano kopię w Pobranych'); if (currentRoute() === 'home') render();
+};
+A['backup-share'] = async () => {
+  try {
+    const file = new File([backupJSON()], backupName(), { type: 'application/json' });
+    await navigator.share({ files: [file], title: 'Plannity – kopia danych' });
+    S.meta.lastBackup = today(); save(); toast('Kopia wysłana ✓'); if (currentRoute() === 'home') render();
+  } catch (e) { if (e && e.name !== 'AbortError') A['backup-export'](); }
 };
 A['backup-import'] = () => {
   const inp = $('#importFile'); if (!inp) return;
@@ -87,7 +100,7 @@ A['backup-import'] = () => {
       const d = JSON.parse(await f.text());
       if (!d || !Array.isArray(d.tasks) || !Array.isArray(d.habits)) throw new Error('format');
       const def = defaultState();
-      S = { ...def, ...d, ui: { ...def.ui, ...(d.ui || {}) } };
+      S = { ...def, ...d, ui: { ...def.ui, ...(d.ui || {}) }, meta: { ...def.meta, ...(d.meta || {}), lastBackup: today() } };
       save(); closeSheet(); render(); toast('Zaimportowano dane');
     } catch (err) { toast('To nie jest plik kopii Plannity'); }
   };
@@ -101,6 +114,7 @@ function init() {
   S = loadState();
   S.ui.calDate = today(); S.ui.schedWeek = startOfWeek(today()); S.ui.habitReorder = false; S.ui.giftReorder = false;
   rolloverTasks();
+  requestPersist();
   save();
   $('#menuBtn').innerHTML = icon('menu');
   render();

@@ -1,5 +1,5 @@
 /* Plannity – service worker: działanie offline */
-const CACHE = 'plannity-v1.2.0';
+const CACHE = 'plannity-v1.3.0';
 const ASSETS = [
   './', './index.html', './manifest.json', './css/styles.css',
   './js/core.js', './js/home.js', './js/tasks.js', './js/goals.js', './js/habits.js', './js/counters.js',

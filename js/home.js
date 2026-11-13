@@ -39,6 +39,7 @@ V.home = {
   render() {
     return `
     <section class="hero"><div class="hero-date">${fmtLong(today())}</div><h1 class="hero-title">${greeting()}, Kuba</h1></section>
+    ${backupBanner()}
     <section class="tiles">${MODULES.map(tileHTML).join('')}</section>
     <section class="card" id="weather">${weatherHTML()}</section>
     <section class="card sun" id="sun">${sunHTML()}</section>`;
